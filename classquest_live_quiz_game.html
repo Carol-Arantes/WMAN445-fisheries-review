@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClassQuest - Classroom Quiz Game</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Tone.js for Sound Effects -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-game {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    
+    /* Answer shape gradients */
+    .bg-red-quiz { background: linear-gradient(135deg, #e11d48, #be123c); }
+    .bg-blue-quiz { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+    .bg-yellow-quiz { background: linear-gradient(135deg, #d97706, #b45309); }
+    .bg-green-quiz { background: linear-gradient(135deg, #16a34a, #15803d); }
+
+    .btn-press {
+      transition: all 0.1s ease;
+    }
+    .btn-press:active {
+      transform: scale(0.96);
+    }
+
+    /* Pulse Timer Animation */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .timer-warning {
+      animation: pulse-ring 0.6s infinite;
+      color: #ef4444;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col justify-between overflow-x-hidden selection:bg-purple-500 selection:text-white">
+
+  <!-- TOP NAV BAR -->
+  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('dashboard')">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-purple-500/30">
+        <i class="fa-solid font-game">Q</i>
+      </div>
+      <div>
+        <h1 class="font-game text-2xl font-bold tracking-wide bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+          ClassQuest
+        </h1>
+        <p class="text-xs text-slate-400">Free Open-Access Classroom Quiz Review</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-3">
+      <button id="soundToggleBtn" onclick="toggleAudio()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium flex items-center space-x-2 transition">
+        <i class="fa-solid fa-volume-high" id="soundIcon"></i>
+        <span id="soundText" class="hidden sm:inline">Sound On</span>
+      </button>
+      <button onclick="switchView('quizEditor')" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold shadow-md shadow-purple-600/20 transition flex items-center space-x-2">
+        <i class="fa-solid fa-plus"></i>
+        <span>Create Quiz</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-grow flex flex-col justify-center max-w-6xl w-full mx-auto p-4 sm:p-6">
+
+    <!-- VIEW 1: DASHBOARD / QUIZ SELECTOR -->
+    <section id="viewDashboard" class="space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-800 to-slate-800/60 p-6 rounded-2xl border border-slate-700/60 shadow-xl">
+        <div>
+          <h2 class="font-game text-3xl font-bold text-white mb-2">Classroom Quiz Library</h2>
+          <p class="text-slate-300 text-sm max-w-xl">
+            Select a review topic to host live for your class, or create custom quiz decks for fisheries management, biology, geography, and more.
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="createNewBlankQuiz()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-purple-900/40 transition">
+            <i class="fa-solid fa-wand-magic-sparkles mr-2"></i>New Custom Quiz
+          </button>
+        </div>
+      </div>
+
+      <!-- QUIZ GRID -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="quizGrid">
+        <!-- Dynamic Quiz Cards Inserted Here -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: LOBBY (HOST SCREEN) -->
+    <section id="viewLobby" class="hidden text-center space-y-8 py-6">
+      <div class="bg-slate-800/80 p-8 rounded-3xl border border-slate-700 shadow-2xl max-w-3xl mx-auto space-y-6">
+        <span id="lobbySubjectBadge" class="px-4 py-1.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold uppercase tracking-wider">Subject</span>
+        <h2 id="lobbyTitle" class="font-game text-4xl sm:text-5xl font-extrabold text-white">Quiz Title</h2>
+        <p id="lobbyDescription" class="text-slate-300 text-sm sm:text-base max-w-lg mx-auto">Get ready! Students join by entering their names below or taking turns on screen.</p>
+        
+        <!-- Game Pin Box -->
+        <div class="bg-slate-900 p-6 rounded-2xl border border-purple-500/30 inline-block shadow-inner min-w-[280px]">
+          <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold block mb-1">Game Room PIN</span>
+          <span id="lobbyPin" class="font-game text-5xl font-black text-amber-400 tracking-wider">849 201</span>
+        </div>
+
+        <!-- Quick Add Player Form -->
+        <div class="max-w-md mx-auto pt-2">
+          <!-- Play Mode Selector Toggle -->
+          <div class="flex justify-center mb-3">
+            <div class="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-700">
+              <button type="button" id="modeIndividualBtn" onclick="setPlayMode('individual')" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white transition">
+                <i class="fa-solid fa-user mr-1"></i> Individual Play
+              </button>
+              <button type="button" id="modeTeamBtn" onclick="setPlayMode('team')" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-users mr-1"></i> Team Mode
+              </button>
+            </div>
+          </div>
+
+          <form onsubmit="handleAddPlayer(event)" class="flex gap-2">
+            <input type="text" id="playerNameInput" placeholder="Enter student or player name..." class="flex-grow px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-sm">
+            <button type="submit" class="px-5 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold text-sm transition">
+              <i class="fa-solid fa-user-plus mr-1"></i> Join
+            </button>
+          </form>
+        </div>
+
+        <!-- Joined Players List -->
+        <div>
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+            <span id="playerTypeLabel">Players</span> Joined (<span id="playerCount">0</span>)
+          </h3>
+          <div id="playersList" class="flex flex-wrap justify-center gap-3 max-h-48 overflow-y-auto p-2">
+            <!-- Player Pills -->
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-700/60 flex flex-wrap justify-center gap-4">
+          <button onclick="switchView('dashboard')" class="px-6 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold transition">
+            Cancel
+          </button>
+          <button onclick="startGame()" class="px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-lg shadow-lg shadow-emerald-900/40 transition btn-press">
+            <i class="fa-solid fa-play mr-2"></i>Start Game
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: LIVE GAME QUESTION SCREEN -->
+    <section id="viewGame" class="hidden space-y-6">
+      <!-- Game Header (Progress & Timer) -->
+      <div class="flex items-center justify-between bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md">
+        <div class="flex items-center space-x-3">
+          <span class="px-3 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs font-semibold" id="gameProgressText">Q 1/20</span>
+          <span class="hidden sm:inline text-slate-400 text-xs" id="gameCurrentSubject">General Knowledge</span>
+        </div>
+
+        <!-- Timer Circle -->
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-stopwatch text-amber-400 text-xl"></i>
+          <span id="gameTimer" class="font-game text-3xl font-extrabold text-amber-400 w-12 text-center">20</span>
+        </div>
+
+        <button onclick="abortGame()" class="text-xs text-slate-400 hover:text-red-400 transition">
+          <i class="fa-solid fa-xmark mr-1"></i>End Game
+        </button>
+      </div>
+
+      <!-- Question Text Banner -->
+      <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl text-center min-h-[160px] flex items-center justify-center">
+        <h2 id="gameQuestionText" class="font-game text-2xl sm:text-3xl font-bold text-white leading-relaxed">
+          Question prompt goes here...
+        </h2>
+      </div>
+
+      <!-- Answer Choice Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="answerChoicesGrid">
+        <!-- Choice buttons generated dynamically -->
+      </div>
+
+      <!-- Active Player Turn Indicator -->
+      <div class="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div class="flex items-center space-x-2 text-slate-300">
+          <i class="fa-solid fa-users text-purple-400"></i>
+          <span>Active Players / Teams:</span>
+          <span id="activePlayerBadge" class="font-semibold text-white bg-slate-700 px-2.5 py-0.5 rounded-full text-xs">Everyone</span>
+        </div>
+        <div class="text-slate-400 text-xs" id="answersSubmittedCounter">
+          Select the correct answer on screen or present to class!
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: QUESTION RESULT OVERLAY -->
+    <section id="viewResult" class="hidden text-center space-y-8 py-6">
+      <div class="bg-slate-800/90 p-8 rounded-3xl border border-slate-700 shadow-2xl max-w-2xl mx-auto space-y-6">
+        <div id="resultHeaderIcon" class="text-6xl text-emerald-400">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        
+        <h2 id="resultTitle" class="font-game text-3xl sm:text-4xl font-bold text-white">Time's Up!</h2>
+        
+        <div class="p-6 rounded-2xl bg-slate-900/80 border border-slate-700/80">
+          <p class="text-xs text-slate-400 uppercase tracking-widest mb-2 font-semibold">Correct Answer</p>
+          <p id="correctAnswerText" class="font-game text-2xl text-emerald-400 font-bold">Paris</p>
+          <p id="explanationText" class="text-slate-300 text-sm mt-3 border-t border-slate-800 pt-3 hidden">
+            Explanation details...
+          </p>
+        </div>
+
+        <!-- Quick Leaderboard Snippet -->
+        <div>
+          <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Top Leaderboard</h3>
+          <div id="miniLeaderboard" class="space-y-2 max-w-md mx-auto">
+            <!-- Mini top 3 players -->
+          </div>
+        </div>
+
+        <button onclick="nextQuestion()" class="px-8 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-lg shadow-lg shadow-purple-900/40 transition btn-press">
+          <span>Next Question</span>
+          <i class="fa-solid fa-arrow-right ml-2"></i>
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW 5: FINAL SCOREBOARD / PODIUM -->
+    <section id="viewPodium" class="hidden text-center space-y-8 py-6">
+      <div class="bg-slate-800/90 p-8 rounded-3xl border border-slate-700 shadow-2xl max-w-3xl mx-auto space-y-8">
+        <div>
+          <i class="fa-solid fa-trophy text-amber-400 text-5xl mb-3 animate-bounce"></i>
+          <h2 class="font-game text-4xl sm:text-5xl font-black text-white">Quiz Completed!</h2>
+          <p class="text-slate-300 text-sm mt-2">Awesome review session class!</p>
+        </div>
+
+        <!-- PODIUM DISPLAY -->
+        <div class="flex justify-center items-end gap-3 sm:gap-6 pt-6 pb-2 min-h-[220px]" id="podiumContainer">
+          <!-- 2nd Place -->
+          <div id="podium2" class="flex flex-col items-center w-24 sm:w-28 opacity-0 transition-all duration-700">
+            <span class="font-game font-bold text-slate-200 text-sm sm:text-base mb-1 truncate max-w-full" id="p2Name">-</span>
+            <span class="text-xs text-purple-300 mb-2 font-semibold" id="p2Score">0 pts</span>
+            <div class="w-full bg-slate-700 border-t-4 border-slate-400 rounded-t-xl h-28 flex items-center justify-center font-game text-2xl font-bold text-slate-300 shadow-lg">
+              2nd
+            </div>
+          </div>
+
+          <!-- 1st Place -->
+          <div id="podium1" class="flex flex-col items-center w-28 sm:w-32 opacity-0 transition-all duration-700">
+            <i class="fa-solid fa-crown text-amber-400 text-2xl mb-1"></i>
+            <span class="font-game font-extrabold text-amber-300 text-base sm:text-lg mb-1 truncate max-w-full" id="p1Name">-</span>
+            <span class="text-xs text-amber-400 mb-2 font-bold" id="p1Score">0 pts</span>
+            <div class="w-full bg-gradient-to-b from-amber-500 to-amber-700 border-t-4 border-amber-300 rounded-t-xl h-36 flex items-center justify-center font-game text-3xl font-black text-white shadow-xl shadow-amber-500/20">
+              1st
+            </div>
+          </div>
+
+          <!-- 3rd Place -->
+          <div id="podium3" class="flex flex-col items-center w-24 sm:w-28 opacity-0 transition-all duration-700">
+            <span class="font-game font-bold text-slate-200 text-sm sm:text-base mb-1 truncate max-w-full" id="p3Name">-</span>
+            <span class="text-xs text-amber-600 mb-2 font-semibold" id="p3Score">0 pts</span>
+            <div class="w-full bg-slate-800 border-t-4 border-amber-800 rounded-t-xl h-20 flex items-center justify-center font-game text-xl font-bold text-amber-700 shadow-md">
+              3rd
+            </div>
+          </div>
+        </div>
+
+        <!-- FULL RANKING TABLE -->
+        <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-700 text-left">
+          <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-2">Final Standings</h3>
+          <div id="fullLeaderboard" class="space-y-2 max-h-48 overflow-y-auto">
+            <!-- Full rank list -->
+          </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-4">
+          <button onclick="switchView('dashboard')" class="px-6 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-sm transition">
+            Back to Library
+          </button>
+          <button onclick="restartCurrentQuiz()" class="px-8 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-900/40 transition btn-press">
+            <i class="fa-solid fa-rotate-right mr-2"></i>Play Again
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 6: QUIZ CREATOR / EDITOR -->
+    <section id="viewEditor" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-800 p-6 rounded-2xl border border-slate-700">
+        <div>
+          <h2 class="font-game text-2xl font-bold text-white">Quiz Creator</h2>
+          <p class="text-slate-400 text-xs mt-1">Design customized review questions for your curriculum.</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="switchView('dashboard')" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold transition">
+            Cancel
+          </button>
+          <button onclick="saveQuizFromEditor()" class="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-md shadow-emerald-900/30 transition">
+            <i class="fa-solid fa-floppy-disk mr-1"></i> Save Quiz
+          </button>
+        </div>
+      </div>
+
+      <!-- Quiz Metadata Form -->
+      <div class="bg-slate-800/80 p-6 rounded-2xl border border-slate-700/80 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Quiz Title</label>
+            <input type="text" id="editorTitle" placeholder="e.g. WMAN 445 Fisheries Exam Review" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Subject</label>
+            <input type="text" id="editorSubject" placeholder="e.g. Fisheries Management" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Description</label>
+          <input type="text" id="editorDesc" placeholder="Brief summary of what this review covers..." class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-500">
+        </div>
+      </div>
+
+      <!-- Questions List Container -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-game text-xl font-bold text-white">Questions</h3>
+          <button onclick="addBlankQuestionToEditor()" class="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/30 text-xs font-semibold transition flex items-center space-x-1">
+            <i class="fa-solid fa-plus"></i>
+            <span>Add Question</span>
+          </button>
+        </div>
+
+        <div id="editorQuestionsList" class="space-y-6">
+          <!-- Dynamic Question Cards -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-950 border-t border-slate-800/80 py-4 px-6 text-center text-slate-500 text-xs">
+    <p>ClassQuest Live &bull; Free Classroom Engagement Tool &bull; Fisheries Management Expanded Review</p>
+  </footer>
+
+  <!-- CUSTOM MODAL DIALOG -->
+  <div id="customModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <h3 id="modalTitle" class="font-game text-xl font-bold text-white">Notice</h3>
+      <p id="modalMessage" class="text-slate-300 text-sm leading-relaxed"></p>
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm transition">
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ===================================================================
+       1. INITIAL DATA & PRESET QUIZZES (EXPANDED WMAN 445 COMPLETE DECK)
+       =================================================================== */
+    const PRESET_QUIZZES = [
+      {
+        id: 'wman445-complete-30q-review',
+        title: 'WMAN 445: Complete 30-Question Fisheries Review',
+        subject: 'Fisheries Science',
+        description: 'Master review deck featuring all 30 questions on Population Dynamics, Mortality, Community Size Spectra, Legal Frameworks, and Life History Strategies.',
+        questions: [
+          {
+            question: 'Which concept describes the phenomenon where each generation accepts a degraded ecological state as the normal baseline, failing to perceive historical population declines?',
+            choices: ['Shifting baseline syndrome', 'Tragedy of the commons', 'Ecosystem overfishing', 'Depensatory mortality'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Formulated by Dr. Daniel Pauly, this concept explains how perception of environmental degradation shifts across generations.'
+          },
+          {
+            question: 'What are the three core components that comprise the traditional "stool" model of fisheries management?',
+            choices: ['Aquatic fauna, Habitat, and Users', 'Recruitment, Growth, and Natural Mortality', 'Inventory, Operational Planning, and Monitoring', 'Government agencies, Scientists, and Enforcement'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Fisheries management requires balanced consideration of fish populations (fauna), physical environment (habitat), and human stakeholders (users).'
+          },
+          {
+            question: 'In adaptive management, which option correctly pairs a phase with a SMART management action?',
+            choices: ['Strategic Planning: Increase average bass length to 350 mm in 5 yrs', 'Inventory: Implementing a 5-fish daily bag limit', 'Operational Planning: Conducting annual creel surveys', 'Monitoring: Setting a qualitative goal to make fishery high quality'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Setting SMART (Specific, Measurable, Achievable, Realistic, Time-bound) targets is the hallmark of strategic planning.'
+          },
+          {
+            question: 'In the Schaefer surplus-production model, at what biomass level relative to carrying capacity (K) does MSY occur?',
+            choices: ['0.5 K', '1.0 K', '0.25 K', '0.75 K'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'In logistic population growth models, surplus production reaches its maximum inflection point at half of carrying capacity (0.5 K).'
+          },
+          {
+            question: 'When using catch curve analysis [ln(Nt) = ln(N0) - Zt], how is the instantaneous total mortality rate (Z) determined?',
+            choices: ['As the absolute value of the slope of the descending limb', 'As the y-intercept of the linear regression line', 'By calculating e^(-Z) directly from sample mean age', 'By subtracting natural mortality (M) from annual survival (S)'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'The negative slope of the linear regression fitted to log-transformed catches across fully recruited age classes equals -Z.'
+          },
+          {
+            question: 'If total instantaneous mortality rate Z = 0.5, what is the annual survival rate (S) and annual mortality rate (A)?',
+            choices: ['S = e^(-0.5) ≈ 0.61 and A = 1 - S ≈ 0.39', 'S = 0.50 and A = 0.50', 'S = e^(0.5) ≈ 1.65 and A = 0.65', 'S = 0.39 and A = 0.61'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Annual survival S = e^(-Z) = e^(-0.5) ≈ 0.6065 (60.7%), and finite annual mortality A = 1 - S ≈ 0.3935 (39.3%).'
+          },
+          {
+            question: 'Which von Bertalanffy model parameter represents the asymptotic average maximum body length of a fish species?',
+            choices: ['L∞', 'k', 't0', 'Wr'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'L∞ defines the theoretical asymptotic average maximum length achieved if individuals live and grow indefinitely.'
+          },
+          {
+            question: 'In a closed mark-recapture study (M=20 marked, C=30 captured, R=10 recaptured), what is the estimated population size (N)?',
+            choices: ['60', '150', '40', '50'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Using the Lincoln-Peterson formula N = (M * C) / R = (20 * 30) / 10 = 60.'
+          },
+          {
+            question: 'In spatial ecology, how do "grain" and "extent" differ when designing a stream sampling protocol?',
+            choices: ['Grain is finest sampling unit size; Extent is total study area boundary', 'Grain is total watershed size; Extent is individual transect size', 'Grain represents temporal duration; Extent represents gear efficiency', 'Grain measures habitat complexity; Extent measures species richness'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Grain refers to the finest spatial/temporal sample resolution, while extent is the broader spatial boundary.'
+          },
+          {
+            question: 'Which human dimensions valuation technique estimates non-market economic benefits by calculating net willingness-to-pay?',
+            choices: ['Economic valuation', 'Direct economic impact analysis', 'Secondary economic multiplier analysis', 'Rapid Rural Appraisal'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Economic valuation measures consumer surplus / net willingness to pay beyond actual expenditures for non-market public goods.'
+          },
+          {
+            question: 'Which dynamic rate function represents the addition of new individuals to the catchable portion of a population?',
+            choices: ['Recruitment', 'Fecundity', 'Somatogenesis', 'Bioenergetics'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Recruitment is the growth process where young individuals reach vulnerability to gear or legally catchable size.'
+          },
+          {
+            question: 'How is fishing mortality rate (F) related to natural mortality rate (M) when calculating total mortality (Z)?',
+            choices: ['Z = F + M', 'Z = F * M', 'Z = 1 - (F + M)', 'Z = F / M'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Instantaneous mortality components are additive: total mortality Z equals fishing mortality F plus natural mortality M.'
+          },
+          {
+            question: 'What primary biological mechanism causes compensatory density dependence in growth rates as population density drops?',
+            choices: ['Increased per-capita food availability', 'Increased metabolic costs', 'Decreased habitat availability', 'Reduced reproductive investment'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Lower densities release individuals from food competition, accelerating individual growth rates.'
+          },
+          {
+            question: 'Which sampling gear type is classified as a passive capture device?',
+            choices: ['Gill net', 'Otter trawl', 'Electrofishing boat', 'Beach seine'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Gill nets are static passive gear that rely on voluntary fish movement into the mesh.'
+          },
+          {
+            question: 'In fish age and growth analysis, which calcified structure is used for non-lethal age estimation in scaleless fish?',
+            choices: ['Pectoral fin rays', 'Sagittal otoliths', 'Opercular bones', 'Vertebral centra'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Leading pectoral fin rays can be clipped non-lethally and sectioned to count growth annuli in catfish or sturgeon.'
+          },
+          {
+            question: 'What length limit protects middle size classes while permitting harvest of small fish and trophy individuals?',
+            choices: ['Protected slot limit', 'Minimum length limit', 'Inverted length limit', 'Maximum size limit'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Protected slot limits protect intermediate lengths while allowing retention of small fish and large trophy fish.'
+          },
+          {
+            question: 'Which ecological condition results directly from recruitment overfishing?',
+            choices: ['Spawning stock is reduced below replacement level', 'Fish are harvested smaller than optimal growth yield', 'Planktonic food webs shift to benthic producers', 'Natural mortality M drops to zero'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Recruitment overfishing depletes mature reproductive stocks below levels required to sustain population replacement.'
+          },
+          {
+            question: 'Relative weight (Wr) compares the actual weight of a fish to what standardized metric?',
+            choices: ['75th percentile weight of benchmark population at same length', 'Mean weight of all fish captured in single sample', 'Theoretical weight at L-infinity from growth curves', 'Weight at age zero from bioenergetics models'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Wr compares individual weight to standard weight (Ws) derived from the 75th percentile weight across a species range.'
+          },
+          {
+            question: 'In human dimensions, what does Catch-and-Release Mortality represent?',
+            choices: ['Hooking and handling stress resulting in post-release death', 'Fraction of fish legally harvested by anglers', 'Drop in angler participation after regulation changes', 'Natural mortality rate of unhooked fish'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Catch and release mortality measures the proportion of fish dying from hooking stress or injury after release.'
+          },
+          {
+            question: 'Which spatial concept describes spatially separated local populations linked through occasional dispersal?',
+            choices: ['Metapopulation', 'Sympatric stock', 'Clonal assemblage', 'Ecoregion'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'A metapopulation consists of spatially separated sub-populations linked by movement or larval dispersal.'
+          },
+          {
+            question: 'In Community Size Spectra (CSS) analysis (N ~ M^λ), what ecological attribute is directly indexed by the slope parameter (λ)?',
+            choices: ['Trophic transfer efficiency', 'Genetic diversity', 'Primary productivity', 'Spawning success rate'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'The CSS slope (λ) characterizes how biomass decreases exponentially across increasing body mass classes, indexing trophic transfer efficiency.'
+          },
+          {
+            question: 'When high densities of invasive Silver Carp invade a river system, how does their establishment alter the fish CSS slope?',
+            choices: ['The slope becomes steeper', 'The slope becomes horizontal (slope = 0)', 'The slope becomes positive', 'The slope remains unchanged'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Invasive planktivores deplete zooplankton, suppressing growth of native larger fish and making the size spectrum slope steeper.'
+          },
+          {
+            question: 'Based on empirical threshold research in large river systems, at what relative biomass proportion do invasive bigheaded carps begin significantly altering food webs?',
+            choices: ['24% of total fish biomass', '5% of total fish biomass', '50% of total fish biomass', '75% of total fish biomass'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Empirical studies indicate a sharp ecological threshold at ~24% invasive carp relative biomass, above which native species suffer significant declines.'
+          },
+          {
+            question: 'Under the Winemiller-Rose framework, which combination of traits characterizes a "Periodic" strategist fish?',
+            choices: ['Large body size, late maturation, high fecundity, low parental care', 'Small body size, early maturation, low fecundity, high parental care', 'Small body size, rapid growth, continuous spawning, low investment', 'Medium body size, synchronous male guarding, high offspring survival'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Periodic strategists (e.g., striped bass) optimize high fecundity and large body size to exploit predictable seasonal environmental pulses.'
+          },
+          {
+            question: 'Why do traditional stock-recruitment models (Ricker/Beverton-Holt) often perform poorly for Periodic life history strategists?',
+            choices: ['Recruitment is predominantly driven by density-independent environmental factors', 'Periodic strategists have no adult spawning stock', 'Density-dependent competition is non-existent in all life stages', 'They produce too few eggs to fit mathematical functions'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Periodic strategists experience extreme year-class recruitment variation driven by physical abiotic factors rather than spawning stock size.'
+          },
+          {
+            question: 'Which legal mechanism requires industrial facilities to obtain permits restricting point-source pollutant discharges into U.S. waters?',
+            choices: ['National Pollutant Discharge Elimination System (NPDES)', 'Endangered Species Act Section 7', 'Public Trust Doctrine Clause 4', 'Magnuson-Stevens Fishery Conservation Act'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'The NPDES permit program under CWA Section 402 regulates point-source discharges into surface waters.'
+          },
+          {
+            question: 'What core legal obligation does the Public Trust Doctrine place upon individual state governments regarding navigable waters?',
+            choices: ['States must preserve and manage navigable waters for public benefit and use', 'States must privatize water rights to highest commercial bidders', 'States must enforce federal Endangered Species Act recovery plans', 'States must eliminate all commercial fishing licenses'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'The Public Trust Doctrine holds that certain natural resources (like navigable waters) are preserved for public use and held in trust by the state.'
+          },
+          {
+            question: 'How does a protected slot length limit regulation function to improve size structure in a crowded fish population?',
+            choices: ['It permits harvest of small fish to reduce competition while protecting intermediate spawners', 'It forbids all angling harvest for five consecutive years', 'It forces anglers to keep only fish exceeding maximum state records', 'It removes all natural mortality from intermediate age classes'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Allowing harvest of small fish reduces stunting and intraspecific competition while protected middle sizes rebuild spawning biomass.'
+          },
+          {
+            question: 'In evaluating harvest regulations, what is the primary risk of neglecting angler non-compliance during management planning?',
+            choices: ['Illegal harvest can completely negate expected biological benefits', 'Anglers will capture all stocked individuals within 24 hours', 'Natural mortality (M) will double automatically', 'The fish population will shift entirely to opportunistic strategists'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Even minor non-compliance (illegal harvest of protected sizes) can undermine intended size structure recovery.'
+          },
+          {
+            question: 'How does increasing total watershed drainage area typically influence the Community Size Spectrum slope in wadable streams?',
+            choices: ['The slope becomes shallower as larger stream reaches support bigger organisms', 'The slope becomes infinitely steep due to headwater isolation', 'The slope drops to zero because large fish cannot survive in larger rivers', 'The slope fluctuates randomly regardless of watershed size'],
+            correctIndex: 0,
+            timeLimit: 20,
+            explanation: 'Larger drainage areas provide greater habitat volume and energy availability, sustaining higher proportions of larger body-sized organisms.'
+          }
+        ]
+      }
+    ];
+
+    // State Variables
+    let quizLibrary = [...PRESET_QUIZZES];
+    let currentQuiz = null;
+    let activeQuestionIndex = 0;
+    let players = []; // Array of { name: string, score: number }
+    let playMode = 'individual'; // 'individual' or 'team'
+    let gameTimerInterval = null;
+    let timeRemaining = 0;
+    let audioEnabled = true;
+    let synth = null;
+    let isEditingQuizIndex = null;
+
+    /* ===================================================================
+       2. SOUND EFFECTS (TONE.JS)
+       =================================================================== */
+    function initAudio() {
+      if (!synth && typeof Tone !== 'undefined') {
+        try {
+          synth = new Tone.PolySynth(Tone.Synth).toDestination();
+          synth.volume.value = -12;
+        } catch (e) {
+          console.warn('Audio context initialization error', e);
+        }
+      }
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const icon = document.getElementById('soundIcon');
+      const text = document.getElementById('soundText');
+      
+      if (audioEnabled) {
+        icon.className = 'fa-solid fa-volume-high';
+        text.innerText = 'Sound On';
+        if (Tone && Tone.context.state !== 'running') {
+          Tone.start();
+        }
+      } else {
+        icon.className = 'fa-solid fa-volume-xmark';
+        text.innerText = 'Sound Muted';
+      }
+    }
+
+    function playToneSound(type) {
+      if (!audioEnabled || !synth) return;
+      try {
+        if (Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        
+        if (type === 'tick') {
+          synth.triggerAttackRelease('C5', '8n');
+        } else if (type === 'correct') {
+          synth.triggerAttackRelease(['C5', 'E5', 'G5'], '4n');
+        } else if (type === 'wrong') {
+          synth.triggerAttackRelease(['C3', 'C#3'], '4n');
+        } else if (type === 'fanfare') {
+          const now = Tone.now();
+          synth.triggerAttackRelease('C4', '8n', now);
+          synth.triggerAttackRelease('E4', '8n', now + 0.15);
+          synth.triggerAttackRelease('G4', '8n', now + 0.3);
+          synth.triggerAttackRelease('C5', '4n', now + 0.45);
+        }
+      } catch (err) {
+        // Fallback or ignore audio errors
+      }
+    }
+
+    /* ===================================================================
+       3. NAVIGATION & VIEW MANAGEMENT
+       =================================================================== */
+    function switchView(viewName) {
+      const views = ['Dashboard', 'Lobby', 'Game', 'Result', 'Podium', 'Editor'];
+      views.forEach(v => {
+        const el = document.getElementById(`view${v}`);
+        if (el) el.classList.add('hidden');
+      });
+
+      const target = document.getElementById(`view${viewName.charAt(0).toUpperCase() + viewName.slice(1)}`);
+      if (target) {
+        target.classList.remove('hidden');
+      }
+
+      if (viewName === 'dashboard') {
+        renderQuizLibrary();
+        clearInterval(gameTimerInterval);
+      }
+    }
+
+    function showCustomModal(title, msg) {
+      document.getElementById('modalTitle').innerText = title;
+      document.getElementById('modalMessage').innerText = msg;
+      document.getElementById('customModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('customModal').classList.add('hidden');
+    }
+
+    /* ===================================================================
+       4. DASHBOARD & QUIZ LIBRARY
+       =================================================================== */
+    function renderQuizLibrary() {
+      const grid = document.getElementById('quizGrid');
+      grid.innerHTML = '';
+
+      quizLibrary.forEach((quiz, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800/80 rounded-2xl p-6 border border-slate-700/80 hover:border-purple-500/50 transition flex flex-col justify-between shadow-lg group';
+
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold">
+                ${quiz.subject || 'General'}
+              </span>
+              <span class="text-xs text-slate-400 font-medium">
+                <i class="fa-solid fa-list-check mr-1"></i>${quiz.questions.length} Questions
+              </span>
+            </div>
+            <h3 class="font-game text-xl font-bold text-white group-hover:text-purple-300 transition line-clamp-1 mb-2">
+              ${quiz.title}
+            </h3>
+            <p class="text-slate-400 text-xs line-clamp-2 mb-6">
+              ${quiz.description || 'Interactive review questions.'}
+            </p>
+          </div>
+
+          <div class="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-2">
+            <button onclick="editQuiz(${idx})" class="px-3 py-2 rounded-xl bg-slate-700/70 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition" title="Edit Quiz">
+              <i class="fa-solid fa-pen-to-square"></i> Edit
+            </button>
+            <button onclick="openLobby(${idx})" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-900/30 transition flex items-center space-x-1 btn-press">
+              <i class="fa-solid fa-play"></i>
+              <span>Host Game</span>
+            </button>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    /* ===================================================================
+       5. LOBBY & PLAYER SETUP
+       =================================================================== */
+    function setPlayMode(mode) {
+      playMode = mode;
+      const indBtn = document.getElementById('modeIndividualBtn');
+      const teamBtn = document.getElementById('modeTeamBtn');
+      const input = document.getElementById('playerNameInput');
+      const label = document.getElementById('playerTypeLabel');
+
+      if (mode === 'individual') {
+        indBtn.className = 'px-4 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white transition';
+        teamBtn.className = 'px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+        input.placeholder = 'Enter student or player name...';
+        label.innerText = 'Students';
+        players = [{ name: 'Solo Player', score: 0 }];
+      } else {
+        teamBtn.className = 'px-4 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white transition';
+        indBtn.className = 'px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+        input.placeholder = 'Enter team name...';
+        label.innerText = 'Teams';
+        players = [
+          { name: 'Team Alpha', score: 0 },
+          { name: 'Team Beta', score: 0 }
+        ];
+      }
+      renderPlayersList();
+    }
+
+    function openLobby(quizIndex) {
+      initAudio();
+      currentQuiz = quizLibrary[quizIndex];
+      playMode = 'individual';
+      
+      document.getElementById('lobbyTitle').innerText = currentQuiz.title;
+      document.getElementById('lobbySubjectBadge').innerText = currentQuiz.subject || 'General Review';
+      document.getElementById('lobbyDescription').innerText = currentQuiz.description || 'Add student names for individual play or switch to team mode!';
+      
+      // Random PIN
+      const pin = Math.floor(100000 + Math.random() * 900000);
+      document.getElementById('lobbyPin').innerText = `${pin.toString().slice(0,3)} ${pin.toString().slice(3)}`;
+
+      setPlayMode('individual');
+      switchView('lobby');
+    }
+
+    function handleAddPlayer(e) {
+      e.preventDefault();
+      const input = document.getElementById('playerNameInput');
+      const name = input.value.trim();
+
+      if (!name) return;
+      if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+        showCustomModal('Duplicate Name', 'That name has already been added.');
+        return;
+      }
+
+      if (players.length === 1 && players[0].name === 'Solo Player') {
+        players = [];
+      }
+
+      players.push({ name: name, score: 0 });
+      input.value = '';
+      renderPlayersList();
+      playToneSound('tick');
+    }
+
+    function removePlayer(index) {
+      players.splice(index, 1);
+      renderPlayersList();
+    }
+
+    function renderPlayersList() {
+      const container = document.getElementById('playersList');
+      const countEl = document.getElementById('playerCount');
+      countEl.innerText = players.length;
+
+      container.innerHTML = '';
+
+      if (players.length === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-500 italic">No players joined yet. Type a name above!</span>`;
+        return;
+      }
+
+      players.forEach((p, idx) => {
+        const pill = document.createElement('div');
+        pill.className = 'px-3 py-1.5 rounded-full bg-slate-700/80 border border-slate-600 text-slate-200 text-xs font-semibold flex items-center space-x-2 animate-bounce-short';
+        pill.innerHTML = `
+          <span><i class="fa-solid fa-user-astronaut text-purple-400 mr-1.5"></i>${p.name}</span>
+          <button onclick="removePlayer(${idx})" class="text-slate-400 hover:text-red-400 transition ml-1">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        `;
+        container.appendChild(pill);
+      });
+    }
+
+    /* ===================================================================
+       6. LIVE GAMEPLAY LOOP
+       =================================================================== */
+    function startGame() {
+      if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
+        showCustomModal('Cannot Start', 'This quiz contains no questions.');
+        return;
+      }
+
+      if (players.length === 0) {
+        players = [{ name: 'Classroom Players', score: 0 }];
+      }
+
+      players.forEach(p => p.score = 0);
+      activeQuestionIndex = 0;
+
+      switchView('game');
+      loadQuestion(activeQuestionIndex);
+    }
+
+    function loadQuestion(index) {
+      clearInterval(gameTimerInterval);
+      const q = currentQuiz.questions[index];
+
+      // Update Status Bar
+      document.getElementById('gameProgressText').innerText = `Question ${index + 1} / ${currentQuiz.questions.length}`;
+      document.getElementById('gameCurrentSubject').innerText = currentQuiz.title;
+
+      // Question Text
+      document.getElementById('gameQuestionText').innerText = q.question;
+
+      // Choices
+      const choicesGrid = document.getElementById('answerChoicesGrid');
+      choicesGrid.innerHTML = '';
+
+      const colorClasses = [
+        'bg-red-quiz hover:brightness-110',
+        'bg-blue-quiz hover:brightness-110',
+        'bg-yellow-quiz hover:brightness-110',
+        'bg-green-quiz hover:brightness-110'
+      ];
+
+      const shapeIcons = [
+        'fa-play rotate-[-90deg]', 
+        'fa-diamond',             
+        'fa-circle',              
+        'fa-square'               
+      ];
+
+      q.choices.forEach((choice, choiceIdx) => {
+        const btn = document.createElement('button');
+        btn.onclick = () => submitAnswer(choiceIdx);
+        btn.className = `${colorClasses[choiceIdx % 4]} text-white p-5 sm:p-6 rounded-2xl font-game text-lg sm:text-xl font-bold shadow-lg transition flex items-center space-x-4 text-left border border-white/10 btn-press w-full`;
+
+        btn.innerHTML = `
+          <div class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center shrink-0">
+            <i class="fa-solid ${shapeIcons[choiceIdx % 4]} text-lg"></i>
+          </div>
+          <span class="flex-grow">${choice}</span>
+        `;
+
+        choicesGrid.appendChild(btn);
+      });
+
+      document.getElementById('activePlayerBadge').innerText = players.map(p => p.name).join(', ');
+
+      // Start Countdown Timer
+      timeRemaining = q.timeLimit || 20;
+      updateTimerDisplay();
+
+      gameTimerInterval = setInterval(() => {
+        timeRemaining--;
+        updateTimerDisplay();
+
+        if (timeRemaining <= 5 && timeRemaining > 0) {
+          playToneSound('tick');
+        }
+
+        if (timeRemaining <= 0) {
+          clearInterval(gameTimerInterval);
+          timeUpAnswerReveal(-1); 
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const timerEl = document.getElementById('gameTimer');
+      timerEl.innerText = timeRemaining;
+
+      if (timeRemaining <= 5) {
+        timerEl.classList.add('timer-warning');
+      } else {
+        timerEl.classList.remove('timer-warning');
+      }
+    }
+
+    function submitAnswer(choiceIndex) {
+      clearInterval(gameTimerInterval);
+      const q = currentQuiz.questions[activeQuestionIndex];
+      const isCorrect = choiceIndex === q.correctIndex;
+
+      if (isCorrect) {
+        const bonusPoints = Math.round(500 + (timeRemaining / (q.timeLimit || 20)) * 500);
+        players.forEach(p => p.score += bonusPoints);
+        playToneSound('correct');
+      } else {
+        playToneSound('wrong');
+      }
+
+      timeUpAnswerReveal(choiceIndex);
+    }
+
+    function timeUpAnswerReveal(selectedIndex) {
+      const q = currentQuiz.questions[activeQuestionIndex];
+      const isCorrect = selectedIndex === q.correctIndex;
+
+      switchView('result');
+
+      const resultHeaderIcon = document.getElementById('resultHeaderIcon');
+      const resultTitle = document.getElementById('resultTitle');
+      const correctAnswerText = document.getElementById('correctAnswerText');
+      const explanationText = document.getElementById('explanationText');
+
+      correctAnswerText.innerText = q.choices[q.correctIndex];
+
+      if (selectedIndex === -1) {
+        resultHeaderIcon.className = 'text-6xl text-amber-400';
+        resultHeaderIcon.innerHTML = `<i class="fa-solid fa-hourglass-end"></i>`;
+        resultTitle.innerText = "Time's Up!";
+      } else if (isCorrect) {
+        resultHeaderIcon.className = 'text-6xl text-emerald-400';
+        resultHeaderIcon.innerHTML = `<i class="fa-solid fa-circle-check"></i>`;
+        resultTitle.innerText = "Correct!";
+      } else {
+        resultHeaderIcon.className = 'text-6xl text-red-500';
+        resultHeaderIcon.innerHTML = `<i class="fa-solid fa-circle-xmark"></i>`;
+        resultTitle.innerText = "Incorrect";
+      }
+
+      if (q.explanation) {
+        explanationText.innerText = q.explanation;
+        explanationText.classList.remove('hidden');
+      } else {
+        explanationText.classList.add('hidden');
+      }
+
+      renderMiniLeaderboard();
+    }
+
+    function renderMiniLeaderboard() {
+      const container = document.getElementById('miniLeaderboard');
+      container.innerHTML = '';
+
+      const sorted = [...players].sort((a, b) => b.score - a.score);
+
+      sorted.slice(0, 3).forEach((p, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2.5 rounded-xl bg-slate-800 text-xs border border-slate-700/60';
+        row.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="w-5 font-bold text-slate-400">#${idx + 1}</span>
+            <span class="font-semibold text-white">${p.name}</span>
+          </div>
+          <span class="font-game font-bold text-amber-400">${p.score} pts</span>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function nextQuestion() {
+      activeQuestionIndex++;
+      if (activeQuestionIndex < currentQuiz.questions.length) {
+        switchView('game');
+        loadQuestion(activeQuestionIndex);
+      } else {
+        showFinalPodium();
+      }
+    }
+
+    function abortGame() {
+      clearInterval(gameTimerInterval);
+      switchView('dashboard');
+    }
+
+    /* ===================================================================
+       7. PODIUM & FINAL SCORES
+       =================================================================== */
+    function showFinalPodium() {
+      switchView('podium');
+      playToneSound('fanfare');
+
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 120,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+
+      const sorted = [...players].sort((a, b) => b.score - a.score);
+
+      const p1 = sorted[0] || { name: '-', score: 0 };
+      const p2 = sorted[1] || { name: '-', score: 0 };
+      const p3 = sorted[2] || { name: '-', score: 0 };
+
+      document.getElementById('p1Name').innerText = p1.name;
+      document.getElementById('p1Score').innerText = `${p1.score} pts`;
+
+      document.getElementById('p2Name').innerText = p2.name;
+      document.getElementById('p2Score').innerText = `${p2.score} pts`;
+
+      document.getElementById('p3Name').innerText = p3.name;
+      document.getElementById('p3Score').innerText = `${p3.score} pts`;
+
+      setTimeout(() => { document.getElementById('podium3').style.opacity = '1'; }, 200);
+      setTimeout(() => { document.getElementById('podium2').style.opacity = '1'; }, 500);
+      setTimeout(() => { document.getElementById('podium1').style.opacity = '1'; }, 800);
+
+      const rankContainer = document.getElementById('fullLeaderboard');
+      rankContainer.innerHTML = '';
+
+      sorted.forEach((p, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-3 rounded-xl bg-slate-800 text-xs border border-slate-700/60';
+        row.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <span class="w-6 font-game font-bold text-slate-400">#${idx + 1}</span>
+            <span class="font-semibold text-white">${p.name}</span>
+          </div>
+          <span class="font-game font-bold text-amber-400">${p.score} pts</span>
+        `;
+        rankContainer.appendChild(row);
+      });
+    }
+
+    function restartCurrentQuiz() {
+      if (currentQuiz) {
+        openLobby(quizLibrary.indexOf(currentQuiz));
+      } else {
+        switchView('dashboard');
+      }
+    }
+
+    /* ===================================================================
+       8. QUIZ CREATOR / EDITOR
+       =================================================================== */
+    function createNewBlankQuiz() {
+      isEditingQuizIndex = null;
+      document.getElementById('editorTitle').value = '';
+      document.getElementById('editorSubject').value = '';
+      document.getElementById('editorDesc').value = '';
+      
+      const container = document.getElementById('editorQuestionsList');
+      container.innerHTML = '';
+      
+      addBlankQuestionToEditor();
+      switchView('editor');
+    }
+
+    function editQuiz(index) {
+      isEditingQuizIndex = index;
+      const qz = quizLibrary[index];
+
+      document.getElementById('editorTitle').value = qz.title || '';
+      document.getElementById('editorSubject').value = qz.subject || '';
+      document.getElementById('editorDesc').value = qz.description || '';
+
+      const container = document.getElementById('editorQuestionsList');
+      container.innerHTML = '';
+
+      if (qz.questions && qz.questions.length > 0) {
+        qz.questions.forEach(q => addBlankQuestionToEditor(q));
+      } else {
+        addBlankQuestionToEditor();
+      }
+
+      switchView('editor');
+    }
+
+    function addBlankQuestionToEditor(data = null) {
+      const container = document.getElementById('editorQuestionsList');
+      const qIndex = container.children.length;
+
+      const card = document.createElement('div');
+      card.className = 'bg-slate-800/90 p-6 rounded-2xl border border-slate-700 space-y-4 relative group';
+
+      const qText = data ? data.question : '';
+      const choices = data ? data.choices : ['', '', '', ''];
+      const correctIdx = data ? data.correctIndex : 0;
+      const timeLimit = data ? data.timeLimit : 20;
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between pb-2 border-b border-slate-700">
+          <span class="font-game font-bold text-purple-400 text-sm">Question #${qIndex + 1}</span>
+          <button type="button" onclick="this.closest('.group').remove()" class="text-xs text-slate-400 hover:text-red-400 transition">
+            <i class="fa-solid fa-trash mr-1"></i>Delete
+          </button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Question Prompt</label>
+          <input type="text" class="q-prompt w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-500" value="${qText}" placeholder="Enter question text here...">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${[0,1,2,3].map(i => `
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Option ${i+1}</label>
+              <div class="flex items-center space-x-2">
+                <input type="radio" name="correct_radio_${qIndex}" value="${i}" ${correctIdx === i ? 'checked' : ''} class="q-correct accent-purple-500 cursor-pointer">
+                <input type="text" class="q-choice-${i} w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm" value="${choices[i] || ''}" placeholder="Answer choice ${i+1}">
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="flex items-center space-x-4 pt-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Time Limit (Seconds)</label>
+            <select class="q-time px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs">
+              <option value="10" ${timeLimit === 10 ? 'selected' : ''}>10s</option>
+              <option value="15" ${timeLimit === 15 ? 'selected' : ''}>15s</option>
+              <option value="20" ${timeLimit === 20 ? 'selected' : ''}>20s</option>
+              <option value="30" ${timeLimit === 30 ? 'selected' : ''}>30s</option>
+            </select>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(card);
+    }
+
+    function saveQuizFromEditor() {
+      const title = document.getElementById('editorTitle').value.trim();
+      const subject = document.getElementById('editorSubject').value.trim();
+      const desc = document.getElementById('editorDesc').value.trim();
+
+      if (!title) {
+        showCustomModal('Title Required', 'Please enter a title for your quiz.');
+        return;
+      }
+
+      const qCards = document.querySelectorAll('#editorQuestionsList > div');
+      const questions = [];
+
+      qCards.forEach(card => {
+        const prompt = card.querySelector('.q-prompt').value.trim();
+        const choices = [
+          card.querySelector('.q-choice-0').value.trim(),
+          card.querySelector('.q-choice-1').value.trim(),
+          card.querySelector('.q-choice-2').value.trim(),
+          card.querySelector('.q-choice-3').value.trim()
+        ];
+
+        const radios = card.querySelectorAll('.q-correct');
+        let correctIdx = 0;
+        radios.forEach((r, idx) => { if (r.checked) correctIdx = idx; });
+
+        const timeLimit = parseInt(card.querySelector('.q-time').value, 10) || 20;
+
+        if (prompt && choices.some(c => c !== '')) {
+          questions.push({
+            question: prompt,
+            choices: choices,
+            correctIndex: correctIdx,
+            timeLimit: timeLimit,
+            explanation: ''
+          });
+        }
+      });
+
+      if (questions.length === 0) {
+        showCustomModal('Empty Questions', 'Please add at least one complete question.');
+        return;
+      }
+
+      const formattedQuiz = {
+        id: `custom-quiz-${Date.now()}`,
+        title: title,
+        subject: subject || 'General',
+        description: desc || '',
+        questions: questions
+      };
+
+      if (isEditingQuizIndex !== null) {
+        quizLibrary[isEditingQuizIndex] = formattedQuiz;
+      } else {
+        quizLibrary.unshift(formattedQuiz);
+      }
+
+      switchView('dashboard');
+    }
+
+    /* ===================================================================
+       9. INITIALIZATION
+       =================================================================== */
+    window.onload = function() {
+      renderQuizLibrary();
+    };
+  </script>
+</body>
+</html>
