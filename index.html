@@ -895,8 +895,8 @@
 
       document.getElementById('activePlayerBadge').innerText = players.map(p => p.name).join(', ');
 
-      // Start Countdown Timer
-      timeRemaining = q.timeLimit || 20;
+            // Start Countdown Timer
+      timeRemaining = q.timeLimit || 90;
       updateTimerDisplay();
 
       gameTimerInterval = setInterval(() => {
