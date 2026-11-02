@@ -854,6 +854,16 @@
       clearInterval(gameTimerInterval);
       const q = currentQuiz.questions[index];
 
+      // --- ADD THIS BLOCK TO RANDOMIZE ANSWER CHOICES ---
+      if (!q.shuffled) {
+        const correctAnswerText = q.choices[q.correct];
+        q.choices.sort(() => Math.random() - 0.5);
+        q.correct = q.choices.indexOf(correctAnswerText);
+        q.shuffled = true; // Prevents re-shuffling if the question reloads
+      }
+      // --------------------------------------------------
+
+
       // Update Status Bar
       document.getElementById('gameProgressText').innerText = `Question ${index + 1} / ${currentQuiz.questions.length}`;
       document.getElementById('gameCurrentSubject').innerText = currentQuiz.title;
