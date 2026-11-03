@@ -830,65 +830,75 @@
       });
     }
 
-    /* ===================================================================
-       6. LIVE GAMEPLAY LOOP
-       =================================================================== */
-    function startGame() {
-      if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
-        showCustomModal('Cannot Start', 'This quiz contains no questions.');
-        return;
-      }
+   /* ===================================================================
+   6. LIVE GAMEPLAY LOOP
+   =================================================================== */
+function startGame() {
+  if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
+    showCustomModal('Cannot Start', 'This quiz contains no questions.');
+    return;
+  }
 
-      if (players.length === 0) {
-        players = [{ name: 'Classroom Players', score: 0 }];
-      }
+  // Reset shuffle flags on fresh game start
+  currentQuiz.questions.forEach(q => {
+    delete q.shuffled;
+  });
 
-      players.forEach(p => p.score = 0);
-      activeQuestionIndex = 0;
+  if (players.length === 0) {
+    players = [{ name: 'Classroom Players', score: 0 }];
+  }
 
-      switchView('game');
-      loadQuestion(activeQuestionIndex);
-    }
+  players.forEach(p => p.score = 0);
+  activeQuestionIndex = 0;
 
-    function loadQuestion(index) {
-      clearInterval(gameTimerInterval);
-      const q = currentQuiz.questions[index];
+  switchView('game');
+  loadQuestion(activeQuestionIndex);
+}
 
-      // --- ADD THIS BLOCK TO RANDOMIZE ANSWER CHOICES ---
-      if (!q.shuffled) {
-        const correctAnswerText = q.choices[q.correct];
-        q.choices.sort(() => Math.random() - 0.5);
-        q.correct = q.choices.indexOf(correctAnswerText);
-        q.shuffled = true; // Prevents re-shuffling if the question reloads
-      }
-      // --------------------------------------------------
+function loadQuestion(index) {
+  clearInterval(gameTimerInterval);
+  const q = currentQuiz.questions[index];
 
+  // --- ROBUST SHUFFLE FIX ---
+  if (!q.shuffled) {
+    // 1. Store the exact text of the correct answer first
+    const correctAnswerText = q.choices[q.correct];
+    
+    // 2. Create a shallow copy array so original array reference isn't corrupted
+    q.choices = [...q.choices].sort(() => Math.random() - 0.5);
+    
+    // 3. Update q.correct to point to the new index of that exact text
+    q.correct = q.choices.indexOf(correctAnswerText);
+    
+    // 4. Mark as shuffled for this round
+    q.shuffled = true;
+  }
+  // --------------------------
 
-      // Update Status Bar
-      document.getElementById('gameProgressText').innerText = `Question ${index + 1} / ${currentQuiz.questions.length}`;
-      document.getElementById('gameCurrentSubject').innerText = currentQuiz.title;
+  // Update Status Bar
+  document.getElementById('gameProgressText').innerText = `Question ${index + 1} / ${currentQuiz.questions.length}`;
+  document.getElementById('gameCurrentSubject').innerText = currentQuiz.title;
 
-      // Question Text
-      document.getElementById('gameQuestionText').innerText = q.question;
+  // Question Text
+  document.getElementById('gameQuestionText').innerText = q.question;
 
-      // Choices
-      const choicesGrid = document.getElementById('answerChoicesGrid');
-      choicesGrid.innerHTML = '';
+  // Choices
+  const choicesGrid = document.getElementById('answerChoicesGrid');
+  choicesGrid.innerHTML = '';
 
-      const colorClasses = [
-        'bg-red-quiz hover:brightness-110',
-        'bg-blue-quiz hover:brightness-110',
-        'bg-yellow-quiz hover:brightness-110',
-        'bg-green-quiz hover:brightness-110'
-      ];
+  const colorClasses = [
+    'bg-red-quiz hover:brightness-110',
+    'bg-blue-quiz hover:brightness-110',
+    'bg-yellow-quiz hover:brightness-110',
+    'bg-green-quiz hover:brightness-110'
+  ];
 
-      const shapeIcons = [
-        'fa-play rotate-[-90deg]', 
-        'fa-diamond',             
-        'fa-circle',              
-        'fa-square'               
-      ];
-
+  const shapeIcons = [
+    'fa-play rotate-[-90deg]', 
+    'fa-diamond',              
+    'fa-circle',               
+    'fa-square'                
+  ];
       q.choices.forEach((choice, choiceIdx) => {
         const btn = document.createElement('button');
         btn.onclick = () => submitAnswer(choiceIdx);
@@ -935,26 +945,28 @@
         timerEl.classList.remove('timer-warning');
       }
     }
+function submitAnswer(choiceIndex) {
+  clearInterval(gameTimerInterval);
+  const q = currentQuiz.questions[activeQuestionIndex];
+  
+  // FIX: Change q.correctIndex to q.correct
+  const isCorrect = choiceIndex === q.correct;
 
-    function submitAnswer(choiceIndex) {
-      clearInterval(gameTimerInterval);
+  if (isCorrect) {
+    const bonusPoints = Math.round(500 + (timeRemaining / (q.timeLimit || 90)) * 500);
+    players.forEach(p => p.score += bonusPoints);
+    playToneSound('correct');
+  } else {
+    playToneSound('wrong');
+  }
+
+  timeUpAnswerReveal(choiceIndex);
+}
+
+ function timeUpAnswerReveal(selectedIndex) {
       const q = currentQuiz.questions[activeQuestionIndex];
-      const isCorrect = choiceIndex === q.correctIndex;
-
-      if (isCorrect) {
-        const bonusPoints = Math.round(500 + (timeRemaining / (q.timeLimit || 20)) * 500);
-        players.forEach(p => p.score += bonusPoints);
-        playToneSound('correct');
-      } else {
-        playToneSound('wrong');
-      }
-
-      timeUpAnswerReveal(choiceIndex);
-    }
-
-    function timeUpAnswerReveal(selectedIndex) {
-      const q = currentQuiz.questions[activeQuestionIndex];
-      const isCorrect = selectedIndex === q.correctIndex;
+      // FIX 1: Change q.correctIndex to q.correct
+      const isCorrect = selectedIndex === q.correct;
 
       switchView('result');
 
@@ -963,7 +975,8 @@
       const correctAnswerText = document.getElementById('correctAnswerText');
       const explanationText = document.getElementById('explanationText');
 
-      correctAnswerText.innerText = q.choices[q.correctIndex];
+      // FIX 2: Change q.correctIndex to q.correct
+      correctAnswerText.innerText = q.choices[q.correct];
 
       if (selectedIndex === -1) {
         resultHeaderIcon.className = 'text-6xl text-amber-400';
